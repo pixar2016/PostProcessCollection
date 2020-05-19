@@ -51,6 +51,29 @@
         return gaussian_filter(i.uv, float2(0, _MainTex_TexelSize.y));
     }
 
+    half4 gaussian_fliter1(float2 uv, float2 distance) : SV_Target{
+    	half4 s = tex2D(_MainTex, uv) * 0.227027027;
+    	float2 d1 = float2(distance.x, 0) * 1.3846153846;
+    	s += tex2D(_MainTex, uv + d1) * 0.1581;
+    	s += tex2D(_MainTex, uv - d1) * 0.1581;
+    	float2 d2 = float2(0, distance.y) * 1.3846153846;
+    	s += tex2D(_MainTex, uv + d2) * 0.1581;
+    	s += tex2D(_MainTex, uv - d2) * 0.1581;
+
+    	float2 d3 = float2(distance.x, 0) * 3.2307692308;
+    	s += tex2D(_MainTex, uv + d3) * 0.03513;
+    	s += tex2D(_MainTex, uv - d3) * 0.03513;
+    	float2 d4 = float2(0, distance.y) * 3.2307692308;
+    	s += tex2D(_MainTex, uv + d4) * 0.03513;
+    	s += tex2D(_MainTex, uv - d4) * 0.03513;
+
+    	return s;
+    }
+
+    half4 frag_gaussian(v2f_img i) : SV_Target{
+    	return gaussian_fliter1(i.uv, float2(_MainTex_TexelSize.x, _MainTex_TexelSize.y ));
+    }
+
     half4 frag_composite(v2f_img i) : SV_Target{
         half3 c1 = LinearToGammaSpace(tex2D(_MainTex, i.uv).rgb);
         half3 c2 = LinearToGammaSpace(tex2D(_BlurTex, i.uv).rgb);

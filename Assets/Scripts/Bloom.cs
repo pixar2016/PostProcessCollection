@@ -28,12 +28,14 @@ public class Bloom : MonoBehaviour
         Graphics.Blit(rt_downsample, rt_threshold, _material, 1);
         RenderTexture.ReleaseTemporary(rt_downsample);
         var rt_temp = RenderTexture.GetTemporary(rt_width, rt_height, 0, RenderTextureFormat.DefaultHDR);
-        for(int i = 0; i < 4; i++)
+        for (int i = 0; i < 1; i++)
         {
             Graphics.Blit(rt_threshold, rt_temp, _material, 2);
             Graphics.Blit(rt_temp, rt_threshold, _material, 3);
         }
         _material.SetTexture("_BlurTex", rt_threshold);
+        //Graphics.Blit(rt_threshold, rt_temp, _material, 2);
+        //_material.SetTexture("_BlurTex", rt_temp);
         Graphics.Blit(source, destination, _material, 4);
         RenderTexture.ReleaseTemporary(rt_threshold);
         RenderTexture.ReleaseTemporary(rt_temp);
