@@ -1,74 +1,56 @@
-﻿
-#include "UnityCG.cginc"
-sampler2D _CameraDepthTexture;
-float4 _CameraDepthTexture_TexelSize;
+// Experimental implementation of contact shadows for Unity
+// https://github.com/keijiro/ContactShadows
 
+#include "Common.cginc"
+
+// Shadow mask texture
 sampler2D _ShadowMask;
 
+// Noise texture (used for dithering)
 sampler2D _NoiseTex;
+float2 _NoiseScale;
 
+// Light vector
+// (reversed light direction in view space) * (ray-trace sample interval)
 float3 _LightVector;
 
+// Depth rejection threshold that determines the depth of each pixels.
 float _RejectionDepth;
 
+// Total sample count
 uint _SampleCount;
 
-// Vertex shader - Full-screen triangle with procedural draw
-float2 Vertex(
-	uint vertexID : SV_VertexID,
-	out float4 position : SV_POSITION
-) : TEXCOORD
+// Fragment shader - Screen space ray-trancing shadow pass
+half4 FragmentShadow(float2 uv : TEXCOORD) : SV_Target
 {
-	float x = (vertexID != 1) ? -1 : 3;
-	float y = (vertexID == 2) ? -3 : 1;
-	position = float4(x, y, 1, 1);
+    float mask = tex2D(_ShadowMask, uv).r;
+    if (mask < 0.01) return mask;
 
-	float u = (x + 1) / 2;
-#ifdef UNITY_UV_STARTS_AT_TOP
-	float v = (1 - y) / 2;
-#else
-	float v = (y + 1) / 2;
-#endif
-	return float2(u, v);
-}
+    // Temporal distributed noise offset
+    float offs = tex2D(_NoiseTex, uv * _NoiseScale).a;
 
-float SampleDepth(float2 uv){
-	float z = SAMPLE_DEPTH_TEXTURE_LOD(_CameraDepthTexture, float4(uv, 0, 0));
-#if defined(UNITY_REVERSED_Z)
-	z = 1 - z;
-#endif
-	return z;
-}
+    // View space position of the origin
+    float z0 = SampleRawDepth(uv);
+    if (z0 > 0.999999) return mask; // BG early-out
+    float3 vp0 = InverseProjectUVZ(uv, z0);
 
-float3 GetViewPosFromDepth(float2 uv, float z){
-	//屏幕空间->裁剪空间 
-	float4 clipPos = float4(float3(uv, z) * 2 - 1, 1);
-	//裁剪空间->观察空间/摄像机空间
-	float4 viewPos = mul(unity_CameraInvProjection, clipPos);
-	return float3(viewPos.xy, -viewPos.z) / viewPos.w;
-}
+    // Ray-tracing loop from the origin along the reverse light direction
+    UNITY_LOOP for (uint i = 0; i < _SampleCount; i++)
+    {
+        // View space position of the ray sample
+        float3 vp_ray = vp0 + _LightVector * (i + offs * 2);
 
-float2 ProjectVP(float3 viewPos){
-	float4 clipPos = mul(unity_CameraProjection, float4(viewPos.xy, -viewPos.z, 1));
-	return (clipPos.xy / clipPos.w + 1) * 0.5;
-}
+        // View space position of the depth sample
+        float3 vp_depth = InverseProjectUV(ProjectVP(vp_ray));
 
-half4 FragmentShadow(float2 uv : TEXCOORD) : SV_Target{
-	float shadowmask = tex2D(_ShadowMask, uv).r;
-	float offs = tex2D(_NoiseTex, uv).a;
-	float z0 = SampleDepth(uv);
-	//uv对应观察空间坐标
-	float3 viewPos0 = GetViewPosFromDepth(uv, z0);
-	UNITY_LOOP for(uint i = 0; i < _SampleCount; i++){
-		//由该点向光源发射线
-		float3 viewPos_ray = viewPos0 + _LightVector * (i + offs * 2);
-		float2 temp_uv = ProjectVP(viewPos_ray);
-		float z = SampleDepth(temp_uv);
-		float3 viewPos_depth = GetViewPosFromDepth(temp_uv, z);
+        // Depth difference between ray/depth sample
+        // Negative: Ray sample is closer to the camera (not occluded)
+        // Positive: Ray sample is beyond the depth sample (possibly occluded)
+        float diff = vp_ray.z - vp_depth.z;
 
-		float diff = viewPos_ray.z - viewPos_depth.z;
+        // Occlusion test
+        if (diff > 0.01 * (1 - offs) && diff < _RejectionDepth) return 0;
+    }
 
-		if(diff > 0.01 && diff < _RejectionDepth) return 0;
-	}
-	return shadowmask;
+    return mask;
 }
