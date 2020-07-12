@@ -6,6 +6,7 @@
         _ScanTex("ScanTexture", 2D) = "white" {}
         _ScanDepth("ScanDepth", float) = 0
         _ScanWidth("ScanWidth", float) = 3
+        _MeshWidth("MeshWidth",float) = 1
         _CamFar("CamFar", float) = 500
     }
     SubShader
@@ -60,6 +61,7 @@
             sampler2D _ScanTex;
             float _ScanDepth;
             float _ScanWidth;
+            float _MeshWidth;
             float3 _ScanCenter;
             float _CamFar;
             float4x4 _CamToWorld;
@@ -83,8 +85,8 @@
 				normal = mul( (float3x3)_CamToWorld, normal);  
 				normal = normalize(max(0, (abs(normal) - 0.25)));
 
-                float3 modulo = pixelWorldPos - _ScanWidth*floor(pixelWorldPos/_ScanWidth);
-				modulo = modulo/_ScanWidth;
+                float3 modulo = pixelWorldPos - _MeshWidth*floor(pixelWorldPos/_ScanWidth);
+				modulo = modulo/_MeshWidth;
 
 				fixed4 c_right = tex2D(_ScanTex,modulo.yz)*normal.x;
 				fixed4 c_front = tex2D(_ScanTex,modulo.xy)*normal.z;

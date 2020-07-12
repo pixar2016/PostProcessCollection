@@ -24,6 +24,7 @@ namespace Pixar
 		{
 			_camera = GetComponent<Camera>();
 			_camera.depthTextureMode = DepthTextureMode.Depth;
+			_camera.depthTextureMode |= DepthTextureMode.DepthNormals;
 			if (_material == null)
 			{
 				_shader = Shader.Find("Pixar/ScanEffectShader");
